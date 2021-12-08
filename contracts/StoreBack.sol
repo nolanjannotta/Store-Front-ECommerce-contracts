@@ -94,7 +94,7 @@ contract StoreBack is Ownable {
         emit SetPublicKey(_publicKey);
     }
     
-    function setStoreOpen() public onlyOwner returns(bool) {
+    function setStoreOpen() public onlyOwner {
         storeOpen = !storeOpen;
         emit SetStoreOpen(storeOpen);
         
@@ -136,7 +136,7 @@ contract StoreBack is Ownable {
         receiptContract = receipt;
     }
     // beneficiary address defaults to address(this) 
-    function beneficiarySplitFactory(uint itemIndex, address[] memory payees, uint256[] memory shares_) internal {
+    function _beneficiarySplitFactory(uint itemIndex, address[] memory payees, uint256[] memory shares_) public {
         StoreDataTypes.Item memory itemStruct = forSale[itemIndex];
         
         BeneficiarySplit _beneficiary = new BeneficiarySplit(itemStruct, _msgSender(), payees, shares_);

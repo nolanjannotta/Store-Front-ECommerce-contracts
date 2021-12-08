@@ -4,6 +4,7 @@ require("@nomiclabs/hardhat-etherscan");
 require("@nomiclabs/hardhat-waffle");
 require("hardhat-gas-reporter");
 require("solidity-coverage");
+require('hardhat-contract-sizer');
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -29,7 +30,7 @@ module.exports = {
   settings: {
     optimizer: {
       enabled: true,
-      runs: 10000,
+      runs: 20,
     },
   },
   networks: {
@@ -60,4 +61,10 @@ module.exports = {
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY,
   },
+  contractSizer: {
+    alphaSort: false,
+    disambiguatePaths: false,
+    runOnCompile: true,
+    strict: false,
+  }
 };
