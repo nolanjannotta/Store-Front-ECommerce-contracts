@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 // import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "./StoreReceipt.sol";
 import "./BeneficiarySplit.sol";
+
 import "./StoreDataTypes.sol";
 
 
@@ -38,13 +39,10 @@ contract StoreBack is Ownable {
     mapping(uint => mapping(uint => StoreDataTypes.Order)) public itemIndexToOrder;
     mapping(address => uint) public waitlistBalance;
 
-    struct OrderWaitlist {
-        uint waitlistSize;
-        StoreDataTypes.Order[] waitlistOrders;
 
-    }
 
-    mapping(uint => OrderWaitlist) public itemIndexToWaitlist; //tracks list of waitlisted items
+    mapping(uint => StoreDataTypes.Order[]) public itemIndexToWaitlist; //tracks list of waitlisted items
+    
     
 
 
@@ -87,6 +85,10 @@ contract StoreBack is Ownable {
 
     function setStock(uint _itemId, uint _stock) public onlyOwner {
         forSale[_itemId]._stock = _stock;
+    }
+
+    function resetCurrentCounter(uint _itemId) public onlyOwner {
+        forSale[_itemId]._stockCounter = 0;
     }
     
     function setPublicKey(bytes memory _publicKey) public onlyOwner {
@@ -136,25 +138,32 @@ contract StoreBack is Ownable {
         receiptContract = receipt;
     }
     // beneficiary address defaults to address(this) 
-    function _beneficiarySplitFactory(uint itemIndex, address[] memory payees, uint256[] memory shares_) public {
-        StoreDataTypes.Item memory itemStruct = forSale[itemIndex];
+    // function _beneficiarySplitFactory(uint itemIndex, address[] memory payees, uint256[] memory shares_) public {
+    //     StoreDataTypes.Item memory itemStruct = forSale[itemIndex];
         
-        BeneficiarySplit _beneficiary = new BeneficiarySplit(itemStruct, _msgSender(), payees, shares_);
-        forSale[itemIndex]._beneficiary = address(_beneficiary);
-    }
+    //     BeneficiarySplit _beneficiary = new BeneficiarySplit(itemStruct, _msgSender(), payees, shares_);
+    //     forSale[itemIndex]._beneficiary = address(_beneficiary);
+    // }
 
     
 
 
-    function listItem(string memory _name, uint _basePriceinEth, uint _maxAmount, uint _stock) public onlyOwner  {
+    function listItem(string memory _name, uint _basePriceinEth, uint _maxAmount, uint _stock, uint _waitlistSize) public onlyOwner  {
         
         StoreDataTypes.Item memory item = StoreDataTypes.Item({
+            
+            _currentId: 0,
+            _basePrice: _basePriceinEth,
+            _maxAmount: _maxAmount,
+            _stock: _stock,
+            _stockCounter: 0,
+            _waitlistSize: _waitlistSize,
             _name: _name,
             _beneficiary: payable(address(this)), // default beneficiary set as this contract, to be later withdrawn by owner.
-            _basePrice: _basePriceinEth,
-            _forSale: true,
-            _maxAmount: _maxAmount,
-            _stock: _stock
+           _forSale: true
+            
+            
+            
             
         });
         
@@ -184,7 +193,7 @@ contract StoreBack is Ownable {
     // }
     
     function acceptOrder(uint waitlistIndex, uint itemIndex) public onlyOwner {
-        StoreDataTypes.Order memory order = itemIndexToWaitlist[itemIndex].waitlistOrders[waitlistIndex];
+        StoreDataTypes.Order memory order = itemIndexToWaitlist[itemIndex][waitlistIndex];
         require(order._status == StoreDataTypes.STATUS.Waitlist);
         
         order._status = StoreDataTypes.STATUS.Accepted;

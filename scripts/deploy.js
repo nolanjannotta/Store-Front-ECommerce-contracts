@@ -14,12 +14,18 @@ async function main() {
   // await hre.run('compile');
 
   // We get the contract to deploy
-  const HeresToBeingOnARoll = await hre.ethers.getContractFactory("HeresToBeingOnARoll");
-  const htboar = await HeresToBeingOnARoll.deploy();
+  // const StoreFront = await hre.ethers.getContractFactory("StoreFront", {
+  //   libraries: {
+  //     StoreDataTypes: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+    
+  //   }
+  // });
+  const StoreFront = await hre.ethers.getContractFactory("StoreFront")
+  const storeFront = await StoreFront.deploy("HeresToBeingOnARoll");
 
-  await htboar.deployed();
+  await storeFront.deployed();
 
-  console.log("htboar deployed to:", htboar.address);
+  console.log("storeFront deployed to:", storeFront.address);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

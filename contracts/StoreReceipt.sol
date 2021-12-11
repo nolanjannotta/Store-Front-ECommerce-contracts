@@ -12,11 +12,14 @@ import "./StoreDataTypes.sol";
 
 contract StoreReceipt is ERC721, ERC721Enumerable, ERC721URIStorage {
     using Counters for Counters.Counter;
+
     using StoreDataTypes for StoreDataTypes.Order;
     using StoreDataTypes for StoreDataTypes.Item;
 
     mapping(uint => StoreDataTypes.Item) public idToItem;
     mapping(uint => StoreDataTypes.Order) public idToOrder;
+
+    
 
     modifier onlyStoreFront{
         require(_msgSender() == storeFront, "You can't call this.");
@@ -26,8 +29,7 @@ contract StoreReceipt is ERC721, ERC721Enumerable, ERC721URIStorage {
 
     address public storeFront;
 
-
-    Counters.Counter private _tokenIdCounter;
+    Counters.Counter private _orderNumberCounter;
 
 
 
@@ -49,11 +51,11 @@ contract StoreReceipt is ERC721, ERC721Enumerable, ERC721URIStorage {
         StoreDataTypes.Item memory item, 
         StoreDataTypes.Order memory order) 
         public onlyStoreFront returns (uint)  {
-        _tokenIdCounter.increment();
-        _safeMint(to, _tokenIdCounter.current());
-        idToItem[_tokenIdCounter.current()] = item;
-        idToOrder[_tokenIdCounter.current()] = order;
-        return _tokenIdCounter.current();
+        _orderNumberCounter.increment();
+        _safeMint(to, _orderNumberCounter.current());
+        idToItem[_orderNumberCounter.current()] = item;
+        idToOrder[_orderNumberCounter.current()] = order;
+        return _orderNumberCounter.current();
     }
 
     function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {

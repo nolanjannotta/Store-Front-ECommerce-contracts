@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+
 import "./StoreReceipt.sol";
 import "./StoreBack.sol";
 
@@ -26,31 +27,25 @@ contract StoreFront is StoreBack {
     }
 
     // CHECKERS
-    // function isAccepting() public view returns (bool) {
-    //     return getWaitlist().length < maxWaitlist;
+    function isAccepting(uint itemIndex) public view returns (bool) {
+        return isWaitlisting(itemIndex) || isInStock(itemIndex);
         
-    // }
-
-    function isAccepting(uint itemIndex) public view returns(bool) {
-        return itemIndexToWaitlist[itemIndex].waitlistOrders.length < maxWaitlist;
     }
-    
-    // function isItemInStock(uint itemIndex) public view returns (bool) { 
-    //     return itemIndexToId[itemIndex] < forSale[itemIndex]._maxAmount;
-    // }
 
-    // function isInWaitlist(uint itemId) public view returns (bool) {
-        
-    //     return
-    // }
+    function isWaitlisting(uint itemIndex) public view returns (bool) {
+        uint waitlistSize = forSale[itemIndex]._waitlistSize;
+        uint stockAmount = forSale[itemIndex]._stock;
+        uint stockCounter = forSale[itemIndex]._stockCounter;
+        return stockCounter >= stockAmount && stockCounter < (waitlistSize + stockAmount);
+    }
 
-    function isInStock(uint itemId) public view returns (bool) {
-        return itemIndexToId[itemId] < forSale[itemId]._stock;
+    function isInStock(uint itemIndex) public view returns (bool) {
+        return forSale[itemIndex]._stockCounter < forSale[itemIndex]._stock;
         // return forSale[itemId]._stock >= getAcceptedOrders().length;
         
     }
     function isInRange(uint itemId) public view returns(bool) {
-        return itemIndexToId[itemId] <= forSale[itemId]._maxAmount;
+        return forSale[itemId]._currentId <= forSale[itemId]._maxAmount;
     }
     
     function isStoreOpen() public view returns (bool) {
@@ -137,28 +132,15 @@ contract StoreFront is StoreBack {
         
         return acceptedOrders;
     }
-        
-    
-    function getWaitlist() public view returns (StoreDataTypes.Order[] memory) {
-        uint waitlistLength = 0;
-        uint index = 0;
-        StoreDataTypes.Order[] memory totalItems = listAllOrders();
-        
-        
-        for(uint i = 0; i < totalItems.length; i++) {
-            if(totalItems[i]._status == StoreDataTypes.STATUS(1)) {
-                waitlistLength += 1;
-            }
+
+    function getWaitlist(uint itemIndex) public view returns(StoreDataTypes.Order[] memory) {
+        uint length = forSale[itemIndex]._stockCounter - forSale[itemIndex]._stock;
+        StoreDataTypes.Order[] memory waitlist = new StoreDataTypes.Order[](length);
+        for(uint i = 0; i < length; i++) {
+            waitlist[i] = (itemIndexToWaitlist[itemIndex][i]);
+
         }
-        StoreDataTypes.Order[] memory waitlistOrders = new StoreDataTypes.Order[](waitlistLength);
-        for(uint i = 0; i < totalItems.length; i++) {
-            if(totalItems[i]._status == StoreDataTypes.STATUS(1)) {
-                waitlistOrders[index] = totalItems[i];
-                index ++;
-            }
-        }
-        
-        return waitlistOrders;
+        return waitlist;
     }
            
     
@@ -174,18 +156,19 @@ contract StoreFront is StoreBack {
     }
 
     function composeOrder(StoreDataTypes.STATUS status, uint8 itemIndex, uint id, address purchaser, bytes32 dataHash) internal view returns (StoreDataTypes.Order memory ) {
-        uint finalPrice = fetchFinalPrice(purchaser, id);
+        uint finalPrice = fetchFinalPrice(purchaser, itemIndex);
 
         StoreDataTypes.Order memory order = StoreDataTypes.Order({
             _status: status,
             _id: id,
             _price: finalPrice,
             _collection: itemIndex,
+            _timestamp: block.timestamp,
             _orderData: dataHash,
             _purchaser: purchaser,
             _owner: purchaser,
-            _referral: address(0),
-            _timestamp: block.timestamp
+            _referral: address(0)
+            
             
         });
         return order;
@@ -197,31 +180,39 @@ contract StoreFront is StoreBack {
         require(storeOpen, "store is closed");
         require(forSale[itemIndex]._forSale, "item is not for sale");
         require(isInRange(itemIndex), "item is out of range"); //checks if current itemId is less than or equal to its max amount. 
-        require(!isAccepting(itemIndex), "waitlist full");
+        require(isAccepting(itemIndex), "waitlist full");
+
         uint finalPrice = fetchFinalPrice(msg.sender, itemIndex);
         require(msg.value == finalPrice, "send correct amount");
 
         StoreDataTypes.STATUS status;
-        StoreDataTypes.Item memory item = forSale[itemIndex];
-        address beneficiary = forSale[itemIndex]._beneficiary;
+        StoreDataTypes.Item storage item = forSale[itemIndex];
+        address beneficiary = item._beneficiary;
 
         if(isInStock(itemIndex)) {
-            uint itemId = itemIndexToId[itemIndex] += 1;
+            item._currentId += 1;
             status = StoreDataTypes.STATUS.Accepted;
             addressToDiscountPercent[msg.sender] = 0;
-            Address.sendValue(payable(beneficiary), msg.value);
-            StoreDataTypes.Order memory order = composeOrder(status, itemIndex, itemId, msg.sender, dataHash);
+            item._stockCounter += 1;
+            
+            if(beneficiary != address(this)) {
+                Address.sendValue(payable(beneficiary), msg.value);
+            }
+            
+            StoreDataTypes.Order memory order = composeOrder(status, itemIndex, item._currentId,  _msgSender(), dataHash);
+
             receiptContract.printReceipt(_msgSender(), item, order);
             emit AcceptOrder("acceptedddddddd");
 
 
-        } else if(isAccepting(itemIndex)) {
+        } else if(isWaitlisting(itemIndex)) {
             status = StoreDataTypes.STATUS.Waitlist;
             waitlistBalance[msg.sender] += msg.value;
             addressToDiscountPercent[msg.sender] = 0;
+            item._stockCounter += 1;
             // for orders in the waitlist, item ID is temporarily set to zero. Id is assigned when accepted
             StoreDataTypes.Order memory order = composeOrder(status, itemIndex, 0, msg.sender, dataHash);
-            itemIndexToWaitlist[itemIndex].waitlistOrders.push(order);
+            itemIndexToWaitlist[itemIndex].push(order);
             emit WaitlistOrder("waitlist yooooo");
             
         }
