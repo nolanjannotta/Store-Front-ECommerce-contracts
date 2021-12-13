@@ -1,6 +1,10 @@
-const StoreReceipt = require("./abi/StoreReceipt")
+const StoreReceipt = require("../artifacts/contracts/StoreReceipt.sol/StoreReceipt.json")
+const BeneficiarySplit = require("../artifacts/contracts/BeneficiarySplit.sol/BeneficiarySplit.json")
+
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+
+// console.log(StoreReceipt.abi)
 
 
 // const  StoreBack = artifacts.require('StoreBack');
@@ -14,6 +18,7 @@ describe("Store Front", () => {
   let user1;
   let user2;
   let user3;
+  let artist1, artist2;
   let receiptContract;
   let receiptAddress;
   let order;
@@ -23,7 +28,7 @@ describe("Store Front", () => {
     storeFrontFactory = await ethers.getContractFactory("StoreFront");
     storeFront = await storeFrontFactory.deploy("Nolans Awesome Store");
     storeAddress = storeFront.address;
-    [owner, user1, user2, user3] = await ethers.getSigners();
+    [owner, user1, user2, user3, artist1, artist2] = await ethers.getSigners();
 
 
   });
@@ -46,8 +51,9 @@ describe("Store Front", () => {
   
     describe("receipt deployment", () => {
       before(async () => {
+        // receiptAbi = StoreReceipt.abi
         receiptAddress = await storeFront.receiptContract()
-        receiptContract = new ethers.Contract(receiptAddress, StoreReceipt, owner)
+        receiptContract = new ethers.Contract(receiptAddress, StoreReceipt.abi, owner)
       })
       
       it("deploys reciept contract", async () => {
@@ -55,6 +61,11 @@ describe("Store Front", () => {
 
 
       })
+
+      it("deploys beneficiary splitter implentation contract", async () => {
+        expect(await storeFront.beneficiarySplitImplementation()).to.be.properAddress;
+      })
+
       it("tracks main contract address", async () => {
         expect(await receiptContract.storeFront()).to.equal(storeFront.address)
       })
@@ -101,14 +112,18 @@ describe("Store Front", () => {
         await expect(storeFront.connect(user1).listItem(itemName1, basePrice1, maxAmount1, stock1)).to.be.reverted
       })
 
-      it("sets beneficiary as contract, and sets forsale as true", async() => {
+      it("sets default beneficiary as contract, and sets forsale as true", async() => {
         for (let i = 0; i < 3; i++) {
-          let item = await storeFront.forSale(i)
+          let item = await storeFront.getItem(i)
           expect(item._beneficiary).to.equal(storeFront.address)
           expect(item._forSale).to.equal(true)
 
         }
         
+      })
+      it("deploys beneficiary split contract for item 2 by owner only", async () => {
+        item = storeFront.getItem(2);
+        await storeFront.beneficiarySplitCloner(2, [artist1.address, artist2.address], [70, 30]);
       })
 
     });
@@ -167,13 +182,13 @@ describe("Store Front", () => {
       before(async () => {
         text = "Hello World!"
         bytes32 = ethers.utils.formatBytes32String(text)
-        receiptContract = new ethers.Contract(receiptAddress, StoreReceipt, owner)
+        receiptContract = new ethers.Contract(receiptAddress, StoreReceipt.abi, owner)
         
         
       })
       it("calculates discounted price for user", async () => {
         finalPrice = await storeFront.fetchFinalPrice(user1.address, 2);
-        basePrice = await storeFront.forSale(2);
+        basePrice = await storeFront.getItem(2);
         discount = await storeFront.addressToDiscountPercent(user1.address);
         // console.log(finalPrice)
         // console.log(basePrice._basePrice)
@@ -192,7 +207,7 @@ describe("Store Front", () => {
           expect(await storeFront.connect(user1).purchase(bytes32, 2, { value: finalPrice })).to.emit(storeFront, "AcceptOrder")
 
           // makes sure the item tracks the current stock counter
-          item = await storeFront.forSale(2)
+          item = await storeFront.getItem(2)
           expect(item._stockCounter).to.equal(i) 
           // checks if id is incremented
           expect(item._currentId).to.equal(i)
@@ -212,7 +227,7 @@ describe("Store Front", () => {
 
       })
       it("when out of stock, orders are waitlisted", async () => {
-        item = await storeFront.forSale(2)
+        item = await storeFront.getItem(2)
         waitlistSize = item._waitlistSize
         console.log(waitlistSize.toString())
         for (let i = 1; i <= waitlistSize; i++) {
@@ -224,7 +239,7 @@ describe("Store Front", () => {
           // waitlist = getWaitlist(2)
           // expect(waitlist.length).to.equal(i)
           // // checks if item id is zero
-          // item = await storeFront.forSale(2)
+          // item = await storeFront.getItem(2)
           // expect(item._currentId).to.equal(0)
           // // checks if users in contract balance is increase by item price
           waitlistBalance = await storeFront.waitlistBalance(user2.address)

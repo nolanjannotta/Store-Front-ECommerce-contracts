@@ -26,6 +26,10 @@ contract StoreFront is StoreBack {
         
     }
 
+    function getItem(uint itemIndex) public view returns(StoreDataTypes.Item memory) {
+        return forSale[itemIndex];
+    }
+
     // CHECKERS
     function isAccepting(uint itemIndex) public view returns (bool) {
         return isWaitlisting(itemIndex) || isInStock(itemIndex);
@@ -61,77 +65,77 @@ contract StoreFront is StoreBack {
 
     // THIS MIGHT RUN OUT OF GAS
 
-    function listAllOrders() public view returns (StoreDataTypes.Order[] memory) {
-        uint lastIndex = forSale.length;
-        uint itemCount;
-        uint index = 0;
+    // function listAllOrders() public view returns (StoreDataTypes.Order[] memory) {
+    //     uint lastIndex = forSale.length;
+    //     uint itemCount;
+    //     uint index = 0;
         
         
-        for(uint i = 0; i < lastIndex; i++) {
-            itemCount += itemIndexToId[i];
-        }
+    //     for(uint i = 0; i < lastIndex; i++) {
+    //         itemCount += itemIndexToId[i];
+    //     }
         
-        StoreDataTypes.Order[] memory allOrders = new StoreDataTypes.Order[](itemCount);
+    //     StoreDataTypes.Order[] memory allOrders = new StoreDataTypes.Order[](itemCount);
         
-        for(uint i = 0; i < lastIndex; i++) {
-            for(uint u = 1; u <= itemIndexToId[i]; u++) {
-                StoreDataTypes.Order memory currentOrder = itemIndexToOrder[i][u];
-                allOrders[index] = currentOrder;
-                index ++;
-            }
-        }
+    //     for(uint i = 0; i < lastIndex; i++) {
+    //         for(uint u = 1; u <= itemIndexToId[i]; u++) {
+    //             StoreDataTypes.Order memory currentOrder = itemIndexToOrder[i][u];
+    //             allOrders[index] = currentOrder;
+    //             index ++;
+    //         }
+    //     }
         
-        return allOrders;
+    //     return allOrders;
         
         
-    }
+    // }
     
-    function getMyOrders() public view returns (StoreDataTypes.Order[] memory) {
-        uint userPurchase = 0;
-        uint index = 0;
-        StoreDataTypes.Order[] memory totalItems = listAllOrders();
+    // function getMyOrders() public view returns (StoreDataTypes.Order[] memory) {
+    //     uint userPurchase = 0;
+    //     uint index = 0;
+    //     StoreDataTypes.Order[] memory totalItems = listAllOrders();
         
         
-        for(uint i = 0; i < totalItems.length; i++) {
-            if(totalItems[i]._owner == msg.sender) {
-                userPurchase += 1;
-            }
-        }
-        StoreDataTypes.Order[] memory myOrders = new StoreDataTypes.Order[](userPurchase);
-        for(uint i = 0; i < totalItems.length; i++) {
-            if(totalItems[i]._owner == msg.sender) {
-                myOrders[index] = totalItems[i];
-                index ++;
+    //     for(uint i = 0; i < totalItems.length; i++) {
+    //         if(totalItems[i]._owner == msg.sender) {
+    //             userPurchase += 1;
+    //         }
+    //     }
+    //     StoreDataTypes.Order[] memory myOrders = new StoreDataTypes.Order[](userPurchase);
+    //     for(uint i = 0; i < totalItems.length; i++) {
+    //         if(totalItems[i]._owner == msg.sender) {
+    //             myOrders[index] = totalItems[i];
+    //             index ++;
                 
-            }
-        }
+    //         }
+    //     }
         
-        return myOrders;
+    //     return myOrders;
 
     
-    }
+    // }
     
-    function getAcceptedOrders() public view returns (StoreDataTypes.Order[] memory) {
-        uint acceptedLength = 0;
-        uint index = 0;
-        StoreDataTypes.Order[] memory totalItems = listAllOrders();
+    // function getAcceptedOrders() public view returns (StoreDataTypes.Order[] memory) {
+    //     uint acceptedLength = 0;
+    //     uint index = 0;
+    //     StoreDataTypes.Order[] memory totalItems = listAllOrders();
         
         
-        for(uint i = 0; i < totalItems.length; i++) {
-            if(totalItems[i]._status == StoreDataTypes.STATUS(0)) {
-                acceptedLength += 1;
-            }
-        }
-        StoreDataTypes.Order[] memory acceptedOrders = new StoreDataTypes.Order[](acceptedLength);
-        for(uint i = 0; i < totalItems.length; i++) {
-            if(totalItems[i]._status == StoreDataTypes.STATUS(0)) {
-                acceptedOrders[index] = totalItems[i];
-                index ++;
-            }
-        }
+    //     for(uint i = 0; i < totalItems.length; i++) {
+    //         if(totalItems[i]._status == StoreDataTypes.STATUS(0)) {
+    //             acceptedLength += 1;
+    //         }
+    //     }
+    //     StoreDataTypes.Order[] memory acceptedOrders = new StoreDataTypes.Order[](acceptedLength);
+    //     for(uint i = 0; i < totalItems.length; i++) {
+    //         if(totalItems[i]._status == StoreDataTypes.STATUS(0)) {
+    //             acceptedOrders[index] = totalItems[i];
+    //             index ++;
+    //         }
+    //     }
         
-        return acceptedOrders;
-    }
+    //     return acceptedOrders;
+    // }
 
     function getWaitlist(uint itemIndex) public view returns(StoreDataTypes.Order[] memory) {
         uint length = forSale[itemIndex]._stockCounter - forSale[itemIndex]._stock;

@@ -4,6 +4,7 @@ pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol";
 // import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 // import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 // import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
@@ -39,7 +40,8 @@ contract StoreBack is Ownable {
     mapping(uint => mapping(uint => StoreDataTypes.Order)) public itemIndexToOrder;
     mapping(address => uint) public waitlistBalance;
 
-
+    address public immutable beneficiarySplitImplementation;
+    // address public immutable storeReceiptImplementation;
 
     mapping(uint => StoreDataTypes.Order[]) public itemIndexToWaitlist; //tracks list of waitlisted items
     
@@ -56,7 +58,7 @@ contract StoreBack is Ownable {
     
     
     // list of items for sale by store
-    StoreDataTypes.Item[] public forSale;
+    StoreDataTypes.Item[] internal forSale;
     
     event SetDiscount(address account, uint discount);
     event SetPublicKey(bytes publicKey);
@@ -73,6 +75,8 @@ contract StoreBack is Ownable {
 
     constructor() {
         deployReceipt();
+        beneficiarySplitImplementation = address(new BeneficiarySplit());
+
    
     }
         
@@ -137,13 +141,14 @@ contract StoreBack is Ownable {
         StoreReceipt receipt = new StoreReceipt(address(this));
         receiptContract = receipt;
     }
+
     // beneficiary address defaults to address(this) 
-    // function _beneficiarySplitFactory(uint itemIndex, address[] memory payees, uint256[] memory shares_) public {
-    //     StoreDataTypes.Item memory itemStruct = forSale[itemIndex];
-        
-    //     BeneficiarySplit _beneficiary = new BeneficiarySplit(itemStruct, _msgSender(), payees, shares_);
-    //     forSale[itemIndex]._beneficiary = address(_beneficiary);
-    // }
+    function beneficiarySplitCloner(uint itemIndex, address[] memory payees, uint256[] memory shares_) public onlyOwner {
+        StoreDataTypes.Item storage itemStruct = forSale[itemIndex];
+        address beneficiarySplitClone = Clones.clone(beneficiarySplitImplementation);
+        BeneficiarySplit(payable(beneficiarySplitClone)).initialize(itemStruct, msg.sender, payees, shares_);
+        itemStruct._beneficiary = beneficiarySplitClone;
+    }
 
     
 

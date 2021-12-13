@@ -2,11 +2,11 @@
 
 pragma solidity 0.8.6;
 
-import "@openzeppelin/contracts/finance/PaymentSplitter.sol";
+import "@openzeppelin/contracts-upgradeable/finance/PaymentSplitterUpgradeable.sol";
 import "./StoreDataTypes.sol";
  
 
-contract BeneficiarySplit is PaymentSplitter {
+contract BeneficiarySplit is PaymentSplitterUpgradeable {
 
     using StoreDataTypes for StoreDataTypes.Item;
 
@@ -20,7 +20,10 @@ contract BeneficiarySplit is PaymentSplitter {
 
     StoreDataTypes.Item public details;
 
-    constructor(StoreDataTypes.Item memory _details, address _owner, address[] memory payees, uint256[] memory shares_) PaymentSplitter(payees, shares_) {
+
+    function initialize(StoreDataTypes.Item memory _details, address _owner, address[] memory payees, uint256[] memory shares_) public initializer {
+        __PaymentSplitter_init(payees, shares_);
+
         details = _details;
         owner = _owner;
         details._beneficiary = address(this);
