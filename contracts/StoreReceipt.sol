@@ -10,14 +10,21 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 
 import "./StoreDataTypes.sol";
 
+
+interface IStoreFront {
+    function getItem(uint itemIndex) external view returns(StoreDataTypes.Item memory);
+
+}
+
+
+
 contract StoreReceipt is ERC721, ERC721Enumerable, ERC721URIStorage {
     using Counters for Counters.Counter;
 
     using StoreDataTypes for StoreDataTypes.Order;
     using StoreDataTypes for StoreDataTypes.Item;
 
-    mapping(uint => StoreDataTypes.Item) public idToItem;
-    mapping(uint => StoreDataTypes.Order) public idToOrder;
+    mapping(uint => StoreDataTypes.Order) private idToOrder;
 
     
 
@@ -36,6 +43,13 @@ contract StoreReceipt is ERC721, ERC721Enumerable, ERC721URIStorage {
     constructor(address _storeFront) ERC721("Here'sToBeingOnARoll", "OnARollReciept") {
         storeFront = _storeFront;
     }
+    function getOrder(uint orderId) public view returns (StoreDataTypes.Order memory) {
+        return idToOrder[orderId];
+    }
+
+    function updateOrder(uint orderId, StoreDataTypes.Order memory order) public onlyStoreFront {
+        idToOrder[orderId] = order;
+    }
 
     // required functions:
     function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal override(ERC721, ERC721Enumerable) {
@@ -48,12 +62,10 @@ contract StoreReceipt is ERC721, ERC721Enumerable, ERC721URIStorage {
 
     function printReceipt(
         address to, 
-        StoreDataTypes.Item memory item, 
         StoreDataTypes.Order memory order) 
         public onlyStoreFront returns (uint)  {
         _orderNumberCounter.increment();
         _safeMint(to, _orderNumberCounter.current());
-        idToItem[_orderNumberCounter.current()] = item;
         idToOrder[_orderNumberCounter.current()] = order;
         return _orderNumberCounter.current();
     }
@@ -63,7 +75,8 @@ contract StoreReceipt is ERC721, ERC721Enumerable, ERC721URIStorage {
     }
 
 
-    function tokenURI(uint256 tokenId)
+    function tokenURI(
+        uint256 tokenId)
         public
         view
         override(ERC721, ERC721URIStorage)
@@ -71,6 +84,15 @@ contract StoreReceipt is ERC721, ERC721Enumerable, ERC721URIStorage {
     {
         return super.tokenURI(tokenId);
     }
+
+
+
+    function getItem(uint itemId) public view returns (StoreDataTypes.Item memory) {
+        IStoreFront store = IStoreFront(storeFront);
+        return store.getItem(itemId);
+
+    }
+
 }
 
 

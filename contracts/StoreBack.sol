@@ -3,7 +3,6 @@
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 // import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 // import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
@@ -15,7 +14,6 @@ import "./StoreDataTypes.sol";
 
 
 contract StoreBack is Ownable {
-    using Counters for Counters.Counter;
     using SafeMath for uint;
 
     using StoreDataTypes for StoreDataTypes.Order;
@@ -25,31 +23,28 @@ contract StoreBack is Ownable {
     StoreReceipt public receiptContract;
     
 
-    Counters.Counter internal counter;
 
+    string public storeName;
+
+    
     bool public storeOpen;
 
     uint public referralDiscount;
-    uint public maxWaitlist;
-    uint public batchSize;
     
     mapping(address => uint) public addressToDiscountPercent;
-    mapping(uint => uint) public itemToWaitlist;
     mapping(address => bool) public addressToReferred;
     mapping(uint => uint) public itemIndexToId; //id is the item id
     mapping(uint => mapping(uint => StoreDataTypes.Order)) public itemIndexToOrder;
     mapping(address => uint) public waitlistBalance;
-
-    address public immutable beneficiarySplitImplementation;
-    // address public immutable storeReceiptImplementation;
-
     mapping(uint => StoreDataTypes.Order[]) public itemIndexToWaitlist; //tracks list of waitlisted items
     
-    
+     address public immutable beneficiarySplitImplementation;
+    // address public immutable storeReceiptImplementation;
 
 
 
-    bytes public orderDataPublicKey;
+
+    bytes public orderDataPublicKey; // public key that order info is encrypted against off chain
     
 
    
@@ -68,14 +63,19 @@ contract StoreBack is Ownable {
     event SetReferralDiscount(uint discount);
     event ListItem(uint itemIndex, StoreDataTypes.Item item);
     event AcceptOrder(string msg);
+    event Cancelled();
+    event Referall(uint itemIndex, address[] _referrals);
+    event WaitlistOrder(string msg);
+
 
 
     
 
 
-    constructor() {
+    constructor(string memory _storeName) {
         deployReceipt();
         beneficiarySplitImplementation = address(new BeneficiarySplit());
+        storeName = _storeName;
 
    
     }
@@ -106,6 +106,8 @@ contract StoreBack is Ownable {
         
     }
 
+
+
     // call this to register an existing beneficiary to a new item
     function setExistingBeneficiary(uint itemIndex, address beneficiary) public onlyOwner {
         forSale[itemIndex]._beneficiary = beneficiary;
@@ -116,16 +118,14 @@ contract StoreBack is Ownable {
         emit SetItemForSale(_forSale);
         return forSale[itemIndex]._forSale;    
     }
-    
-    
-    function setMaxWaitlist(uint itemId, uint _maxWaitlist) public onlyOwner { 
-        itemToWaitlist[itemId] = _maxWaitlist;
-        emit MaxWaitlist(itemId, _maxWaitlist);
+
+
+    function setWaitlistSize(uint itemId, uint _waitlistSize) public onlyOwner { 
+        forSale[itemId]._waitlistSize = _waitlistSize;
+        emit MaxWaitlist(itemId, _waitlistSize);
     }
     
-    function updateStock(uint itemIndex, uint _stock) public onlyOwner {
-        forSale[itemIndex]._stock = _stock;
-    }
+    
     
     function setReferralDiscount(uint _referralDiscount) public onlyOwner {
         referralDiscount = _referralDiscount;
@@ -153,13 +153,17 @@ contract StoreBack is Ownable {
     
 
 
-    function listItem(string memory _name, uint _basePriceinEth, uint _maxAmount, uint _stock, uint _waitlistSize) public onlyOwner  {
+    function listItem(string memory _name, 
+                        uint _basePriceinEth, 
+                        uint _totalSupply, 
+                        uint _stock, 
+                        uint _waitlistSize) public onlyOwner  {
         
         StoreDataTypes.Item memory item = StoreDataTypes.Item({
             
             _currentId: 0,
             _basePrice: _basePriceinEth,
-            _maxAmount: _maxAmount,
+            _totalSupply: _totalSupply,
             _stock: _stock,
             _stockCounter: 0,
             _waitlistSize: _waitlistSize,
@@ -181,39 +185,43 @@ contract StoreBack is Ownable {
         
     }
 
-    // function acceptOrder(uint waitlistIndex) public onlyOwner {
-    //     StoreDataTypes.Order memory order = waitlist[waitlistIndex];
-    //     require(order._status == StoreDataTypes.STATUS.Waitlist);
+    function deleteWaitlistZeroIndex(uint itemIndex) private onlyOwner {
 
-    //     uint collection = order._collection;
-    //     address purchaser = order._purchaser;
-    //     address beneficiary = forSale[collection]._beneficiary;
-    //     uint itemId = itemIndexToId[collection] += 1;
-    //     order._id = itemId;
+        StoreDataTypes.Order[] storage newWaitlist = itemIndexToWaitlist[itemIndex];
 
-    //     // address beneficiary = order._beneficiary;
-    //     uint finalPrice = fetchFinalPrice(purchaser, collection);
-    //     Address.sendValue(payable(beneficiary), finalPrice);
+        for(uint i = 0; i < newWaitlist.length - 1; i++) {
+            newWaitlist[i] = newWaitlist[i + 1];
+        }
 
-    // }
+        newWaitlist.pop();
+        
+        
+
+    }
     
-    function acceptOrder(uint waitlistIndex, uint itemIndex) public onlyOwner {
-        StoreDataTypes.Order memory order = itemIndexToWaitlist[itemIndex][waitlistIndex];
+    function acceptOrder(uint itemIndex) public onlyOwner {
+        StoreDataTypes.Order memory order = itemIndexToWaitlist[itemIndex][0];
+        StoreDataTypes.Item storage item = forSale[itemIndex];
+
         require(order._status == StoreDataTypes.STATUS.Waitlist);
         
         order._status = StoreDataTypes.STATUS.Accepted;
+        item._currentId +=1;
 
         address purchaser = order._purchaser;
-        StoreDataTypes.Item memory item = forSale[itemIndex];
         uint finalPrice = fetchFinalPrice(purchaser, itemIndex);
+        address beneficiary = item._beneficiary;
+
         addressToDiscountPercent[purchaser] = 0;
         waitlistBalance[purchaser] -= finalPrice;
-        receiptContract.printReceipt(_msgSender(), item, order);
+        receiptContract.printReceipt(purchaser, order);
 
-        
-        payable(owner()).transfer(finalPrice);
-        // addressToDiscountPercent[_receiver] = 0;
-        // mintReceipt(purchaser);
+        if(beneficiary != address(this)) {
+            Address.sendValue(payable(beneficiary), finalPrice);
+        }
+
+        deleteWaitlistZeroIndex(itemIndex);
+
         emit AcceptOrder("acceptedddddddd");
         
     }
@@ -221,11 +229,6 @@ contract StoreBack is Ownable {
     function withdraw() public onlyOwner {
         Address.sendValue(payable(_msgSender()), address(this).balance);
     }
-
-    // function mintReceipt(address purchaser) internal {
-    //      safeMint(purchaser);
-        
-    // }
 
     function fetchFinalPrice(address _account, uint _itemIndex) public view returns(uint){
         uint basePrice = forSale[_itemIndex]._basePrice;
@@ -237,15 +240,9 @@ contract StoreBack is Ownable {
         
         
     }
-
-    // function deleteIndex(uint index, StoreDataTypes.Order[] memory orders) internal {
-
-    // for(uint i = index; i < orders.length - 1; i++) {
-    //     orders[i] = orders[i + 1];
-    // }
-    // orders.pop();
-    // }
-
+    function getWaitlist(uint itemIndex) public view returns(StoreDataTypes.Order[] memory) {
+        return itemIndexToWaitlist[itemIndex];
+    }
 
 
 

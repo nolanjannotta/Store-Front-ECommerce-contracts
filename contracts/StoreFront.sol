@@ -3,7 +3,6 @@
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
@@ -13,15 +12,10 @@ import "./StoreBack.sol";
 
 contract StoreFront is StoreBack {
 
-    string public storeName;
+    
 
-    event Cancelled();
-    event Referrall(uint itemIndex, address _referral);
-    event WaitlistOrder(string msg);
-
-    constructor(string memory _storeName)  {
-        storeName = _storeName;
-        batchSize = 2;
+    constructor(string memory _storeName) StoreBack(_storeName)  {
+        
         
         
     }
@@ -49,7 +43,7 @@ contract StoreFront is StoreBack {
         
     }
     function isInRange(uint itemId) public view returns(bool) {
-        return forSale[itemId]._currentId <= forSale[itemId]._maxAmount;
+        return forSale[itemId]._currentId < forSale[itemId]._totalSupply;
     }
     
     function isStoreOpen() public view returns (bool) {
@@ -137,25 +131,38 @@ contract StoreFront is StoreBack {
     //     return acceptedOrders;
     // }
 
-    function getWaitlist(uint itemIndex) public view returns(StoreDataTypes.Order[] memory) {
-        uint length = forSale[itemIndex]._stockCounter - forSale[itemIndex]._stock;
-        StoreDataTypes.Order[] memory waitlist = new StoreDataTypes.Order[](length);
-        for(uint i = 0; i < length; i++) {
-            waitlist[i] = (itemIndexToWaitlist[itemIndex][i]);
+    // function getWaitlist(uint itemIndex) public view returns(StoreDataTypes.Order[] memory) {
+    //     uint length = forSale[itemIndex]._stockCounter - forSale[itemIndex]._stock;
+    //     StoreDataTypes.Order[] memory waitlist = new StoreDataTypes.Order[](length);
+    //     for(uint i = 0; i < length; i++) {
+    //         waitlist[i] = (itemIndexToWaitlist[itemIndex][i]);
 
-        }
-        return waitlist;
-    }
+    //     }
+    //     return waitlist;
+    // }
            
     
     function refer(uint itemIndex, uint id, address _referral) public {
-        require(addressToReferred[_referral] == false);
-        require(itemIndexToOrder[itemIndex][id]._owner == msg.sender);
-        require(itemIndexToOrder[itemIndex][id]._referral == address(0));
+   
+        // require(addressToReferred[_referral] == false); // prevents same address getting referred multiple times
+        
+        StoreDataTypes.Order memory order = receiptContract.getOrder(id);
+        
+        require(order._referrals[0] == address(0) || order._referrals[1] == address(0));
+        // require(itemIndexToOrder[itemIndex][id]._owner == msg.sender);
+        require(order._owner == msg.sender);
+
         addressToDiscountPercent[_referral] = referralDiscount;
-        addressToReferred[_referral] = true;
-        itemIndexToOrder[itemIndex][id]._referral = _referral;
-        emit Referrall(itemIndex, _referral);
+        // addressToReferred[_referral] = true;
+
+        if(order._referrals[0] == address(0)) {
+            order._referrals[0] = _referral;
+        }
+        else{
+            order._referrals[1] = _referral;
+        }
+        receiptContract.updateOrder(id, order);
+        emit Referall(itemIndex, order._referrals);
 
     }
 
@@ -171,7 +178,7 @@ contract StoreFront is StoreBack {
             _orderData: dataHash,
             _purchaser: purchaser,
             _owner: purchaser,
-            _referral: address(0)
+            _referrals: new address[](2)
             
             
         });
@@ -205,7 +212,7 @@ contract StoreFront is StoreBack {
             
             StoreDataTypes.Order memory order = composeOrder(status, itemIndex, item._currentId,  _msgSender(), dataHash);
 
-            receiptContract.printReceipt(_msgSender(), item, order);
+            receiptContract.printReceipt(_msgSender(), order);
             emit AcceptOrder("acceptedddddddd");
 
 

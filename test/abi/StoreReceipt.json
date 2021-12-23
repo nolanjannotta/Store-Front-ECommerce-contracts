@@ -145,6 +145,72 @@
     "inputs": [
       {
         "internalType": "uint256",
+        "name": "orderId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getOrder",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "enum StoreDataTypes.STATUS",
+            "name": "_status",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint256",
+            "name": "_id",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "_price",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "_collection",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "_timestamp",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "_orderData",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "address",
+            "name": "_purchaser",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "_owner",
+            "type": "address"
+          },
+          {
+            "internalType": "address[]",
+            "name": "_referrals",
+            "type": "address[]"
+          }
+        ],
+        "internalType": "struct StoreDataTypes.Order",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
         "name": "",
         "type": "uint256"
       }
@@ -153,12 +219,17 @@
     "outputs": [
       {
         "internalType": "uint256",
+        "name": "_currentId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
         "name": "_basePrice",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
-        "name": "_maxAmount",
+        "name": "_totalSupply",
         "type": "uint256"
       },
       {
@@ -244,11 +315,6 @@
         "internalType": "address",
         "name": "_owner",
         "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "_referral",
-        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -321,12 +387,17 @@
         "components": [
           {
             "internalType": "uint256",
+            "name": "_currentId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
             "name": "_basePrice",
             "type": "uint256"
           },
           {
             "internalType": "uint256",
-            "name": "_maxAmount",
+            "name": "_totalSupply",
             "type": "uint256"
           },
           {
@@ -407,9 +478,9 @@
             "type": "address"
           },
           {
-            "internalType": "address",
-            "name": "_referral",
-            "type": "address"
+            "internalType": "address[]",
+            "name": "_referrals",
+            "type": "address[]"
           }
         ],
         "internalType": "struct StoreDataTypes.Order",
@@ -636,6 +707,71 @@
       }
     ],
     "name": "transferFrom",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "orderId",
+        "type": "uint256"
+      },
+      {
+        "components": [
+          {
+            "internalType": "enum StoreDataTypes.STATUS",
+            "name": "_status",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint256",
+            "name": "_id",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "_price",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "_collection",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "_timestamp",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "_orderData",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "address",
+            "name": "_purchaser",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "_owner",
+            "type": "address"
+          },
+          {
+            "internalType": "address[]",
+            "name": "_referrals",
+            "type": "address[]"
+          }
+        ],
+        "internalType": "struct StoreDataTypes.Order",
+        "name": "order",
+        "type": "tuple"
+      }
+    ],
+    "name": "updateOrder",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

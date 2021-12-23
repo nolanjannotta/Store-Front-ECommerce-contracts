@@ -43,10 +43,11 @@ contract BeneficiarySplit is PaymentSplitterUpgradeable {
         return address(this).balance;
     }
 
-    function individualBalance() internal view returns (uint256) {
+    function individualBalance() public view returns (uint256) {
         uint256 totalReceived = address(this).balance + totalReleased();
         return (totalReceived * shares(_msgSender())) / totalShares() - released(_msgSender());
     }
+
 
 
 

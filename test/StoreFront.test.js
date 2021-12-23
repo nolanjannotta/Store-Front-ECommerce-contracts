@@ -22,6 +22,7 @@ describe("Store Front", () => {
   let receiptContract;
   let receiptAddress;
   let order;
+  let item;
 
   before(async () => {
 
@@ -32,6 +33,10 @@ describe("Store Front", () => {
 
 
   });
+  // beforeEach(async () => {
+  //   item = await storeFront.getItem(2);
+
+  // })
 
     describe("deployment", () => {
 
@@ -82,7 +87,7 @@ describe("Store Front", () => {
       let basePrice1, basePrice2, basePrice3
       let stock1, stock2, stock3
       let waitlistSize
-      let beneficiary1, beneficiary2
+      let beneficiarySplitter, beneficiaryDetails
 
       before(() => {
         itemName1 = "TV";
@@ -122,8 +127,21 @@ describe("Store Front", () => {
         
       })
       it("deploys beneficiary split contract for item 2 by owner only", async () => {
-        item = storeFront.getItem(2);
+        
         await storeFront.beneficiarySplitCloner(2, [artist1.address, artist2.address], [70, 30]);
+      })
+      it("beneficiary tracks owner and item", async () => {
+        item = await storeFront.getItem(2);
+        // console.log(item)
+
+        beneficiarySplitter = new ethers.Contract(item._beneficiary, BeneficiarySplit.abi, owner);
+        beneficiaryDetails = await beneficiarySplitter.details()
+        expect(await beneficiarySplitter.owner()).to.equal(owner.address);
+        expect(beneficiaryDetails._name).to.equal(item._name);
+        expect(beneficiaryDetails._beneficiary).to.equal(item._beneficiary);
+        // expect(item).to.equal(beneficiaryDetails)
+        // console.log(beneficiaryDetails)
+        // expect(beneficiaryDetails._name).to.equal(item._name);
       })
 
     });
@@ -178,6 +196,7 @@ describe("Store Front", () => {
       let text, bytes32, finalPrice, basePrice, discount
       let item, order, inStock, waitlisting
       let waitlist, maxWaitlist, waitlistBalance
+      let beneficiaryBalance, artist1Balance, artist2Balance;
       
       before(async () => {
         text = "Hello World!"
@@ -218,12 +237,36 @@ describe("Store Front", () => {
         }
 
       })
+
+      it("computes split amount and transfers to payee", async () => {
+        item = await storeFront.getItem(2);
+        beneficiarySplitter = new ethers.Contract(item._beneficiary, BeneficiarySplit.abi, owner);
+        beneficiaryBalance = await beneficiarySplitter.contractBalance();
+        artist1Balance = await beneficiarySplitter.connect(artist1).individualBalance();
+        artist2Balance = await beneficiarySplitter.connect(artist2).individualBalance();
+        console.log(beneficiaryBalance.toString())
+        console.log(artist1Balance.toString())
+        console.log(artist2Balance.toString())
+        await beneficiarySplitter.connect(artist1).withdraw()
+        await beneficiarySplitter.connect(artist2).withdraw()
+        artist1Balance = await beneficiarySplitter.connect(artist1).individualBalance();
+        artist2Balance = await beneficiarySplitter.connect(artist2).individualBalance();
+        console.log(artist1Balance.toString())
+        console.log(artist2Balance.toString())
+
+        // await expect( ()=>  beneficiarySplitter.pushPayment(artist1.address)).to.changeEtherBalance(artist1.address, artist1Balance)
+
+        // console.log(artist1)
+
+
+
+      })
       it("resets user discount", async () => {
         expect(await storeFront.addressToDiscountPercent(user1.address)).to.equal(0)
       })
       it("should be out of stock, should be waitlisting", async () => {
-        expect(await storeFront.isInStock(2)).to.equal(false)
-        expect(await storeFront.isWaitlisting(2)).to.equal(true)
+        expect(await storeFront.isInStock(2)).to.be.false
+        expect(await storeFront.isWaitlisting(2)).to.be.true
 
       })
       it("when out of stock, orders are waitlisted", async () => {
@@ -235,12 +278,6 @@ describe("Store Front", () => {
           finalPrice = await storeFront.fetchFinalPrice(user2.address, 2);
           // calls purchase function checks for Waitlist event
           expect(await storeFront.connect(user2).purchase(bytes32, 2, { value: finalPrice })).to.emit(storeFront, "WaitlistOrder")
-          // // check if orders are added to wailist array
-          // waitlist = getWaitlist(2)
-          // expect(waitlist.length).to.equal(i)
-          // // checks if item id is zero
-          // item = await storeFront.getItem(2)
-          // expect(item._currentId).to.equal(0)
           // // checks if users in contract balance is increase by item price
           waitlistBalance = await storeFront.waitlistBalance(user2.address)
           console.log(waitlistBalance.toString())
@@ -250,6 +287,7 @@ describe("Store Front", () => {
         
         
       })
+
       it("rejects orders when waitlist is full", async () => {
         finalPrice = await storeFront.fetchFinalPrice(user2.address, 2);
         await expect(storeFront.connect(user2).purchase(bytes32, 2, { value: finalPrice })).to.be.reverted
@@ -264,7 +302,64 @@ describe("Store Front", () => {
 
     })
     describe("accepting wailisted orders", () => {
-      // TO DO!!!
+      let waitlistListBefore, waitlistAfter, receipt, item
+      before(async () => {
+      })
+      it("accepts order, and remove first index of waitlist", async () => {
+        
+        waitlistListBefore = await storeFront.getWaitlist(2)
+        for (i = 0; i <= waitlistListBefore.length - 1; i++) {
+          // console.log(waitlistListBefore.length)
+          waitlistBalance = await storeFront.waitlistBalance(user2.address)
+          waitlistListAfter = await storeFront.getWaitlist(2)
+
+          console.log("waitlist balance:", waitlistBalance.toString())
+          console.log("waitlist length: ", waitlistListAfter.length)
+
+          console.log("accepts order....")
+          expect(await storeFront.acceptOrder(2)).to.emit(storeFront, "AcceptOrder")
+
+          
+          
+        }
+
+
+      })
+      it("tracks total supply", async () => {
+        let item = await storeFront.getItem(2)
+        console.log("waitlist size ", item._waitlistSize.toString())
+        console.log("stock", item._stock.toString())
+        console.log("stock counter", item._stockCounter.toString())
+        await storeFront.receiptContract().then(result => {
+          receipt = new ethers.Contract(result, StoreReceipt.abi, owner)
+          
+        })
+        await receipt.balanceOf(user2.address).then(result => {
+          console.log("user 2 balance", result.toString())
+        })
+        await receipt.balanceOf(user1.address).then(result => {
+          console.log("user 1 balance", result.toString())
+        })
+      })
+
+
     })
+  it("sets 2 referrals per order", async () => {
+      expect(await storeFront.connect(user1).refer(2, 1, user2.address)).to.emit(StoreFront, "Referall")
+    })
+    
+    describe("cancelling orders", () => {
+      let item
+      before(async () => {
+        item = await storeFront.getItem(0)
+      })
+      it("item index 0", async () => {
+        console.log("item index 0", item._name)
+        console.log("item index 0 stock ", item._stock.toString())
+        console.log("item index 0 waitlistsize", item._waitlistSize.toString())
+      })
+      
+    })
+  
   
 });
